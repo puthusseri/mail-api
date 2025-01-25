@@ -15,11 +15,12 @@
  */
 
 module jakarta.mail {
-
     requires java.logging;
     requires transitive jakarta.activation;
-    requires junit;
 
+    // Add JUnit 5 modules
+    requires org.junit.jupiter.api;
+    requires org.junit.jupiter.params;
     exports jakarta.mail;
     exports jakarta.mail.event;
     exports jakarta.mail.internet;
@@ -29,5 +30,6 @@ module jakarta.mail {
     uses jakarta.mail.Provider;
     uses jakarta.mail.util.StreamProvider;
     uses jakarta.mail.util.FactoryFinderTest.Class2;
+
     provides jakarta.mail.util.StreamProvider with jakarta.mail.util.DummyStreamProvider;
 }

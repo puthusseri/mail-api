@@ -16,12 +16,12 @@
 
 package jakarta.mail;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Date;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 public class HeaderTest {
 
@@ -35,8 +35,8 @@ public class HeaderTest {
         assertEquals(h1, h2);
         assertEquals(h1, h1);
         assertNotEquals(h1, h3);
-        assertNotEquals(h1, null);
+        assertNotEquals(null, h1);
         assertNotEquals(h1, h4);
-        assertNotEquals(h1, new Date());
+        assertNotEquals(new Date(), h1);
     }
 }

@@ -16,11 +16,8 @@
 
 package jakarta.mail.internet;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -29,47 +26,30 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Test header folding.
- *
- * @author Bill Shannon
- */
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-@RunWith(Parameterized.class)
 public class FoldTest {
-    private String direction;
-    private String orig;
-    private String expect;
 
-    private static List<Object[]> testData;
-
-    public FoldTest(String direction, String orig, String expect) {
-        this.direction = direction;
-        this.orig = orig;
-        this.expect = expect;
-    }
-
-    @Parameters
+    /**
+     * Provides test data for the parameterized test.
+     */
     public static Collection<Object[]> data() throws IOException {
-        testData = new ArrayList<>();
+        List<Object[]> testData = new ArrayList<>();
         parse(new BufferedReader(new InputStreamReader(
-                FoldTest.class.getResourceAsStream("folddata"))));
+                FoldTest.class.getResourceAsStream("folddata"))), testData);
         return testData;
     }
 
     /**
-     * Read the data from the test file.  Format is multiple of any of
-     * the following:
-     *
-     * FOLD\nString$\nEXPECT\nString$\n
-     * UNFOLD\nString$\nEXPECT\nString$\n
-     * BOTH\nString$\n
+     * Parses the test data from the input file.
      */
-    private static void parse(BufferedReader in) throws IOException {
+    private static void parse(BufferedReader in, List<Object[]> testData) throws IOException {
         String line;
         while ((line = in.readLine()) != null) {
-            if (line.startsWith("#") || line.length() == 0)
+            if (line.startsWith("#") || line.isEmpty())
                 continue;
+
             String orig = readString(in);
             if (line.equals("BOTH")) {
                 testData.add(new Object[]{line, orig, null});
@@ -84,30 +64,34 @@ public class FoldTest {
     }
 
     /**
-     * Read a string that ends with '$', preserving all characters,
+     * Reads a string that ends with '$', preserving all characters,
      * especially including CR and LF.
      */
     private static String readString(BufferedReader in) throws IOException {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         int c;
         while ((c = in.read()) != '$')
             sb.append((char) c);
-        in.readLine();    // throw away rest of line
+        in.readLine(); // throw away the rest of the line
         return sb.toString();
     }
 
-    @Test
-    public void testFold() {
+    /**
+     * Parameterized test for folding and unfolding.
+     */
+    @ParameterizedTest
+    @MethodSource("data")
+    public void testFold(String direction, String orig, String expect) {
         if (direction.equals("BOTH")) {
             String fs = MimeUtility.fold(0, orig);
             String us = MimeUtility.unfold(fs);
-            Assert.assertEquals(orig, us);
+            assertEquals(orig, us);
         } else if (direction.equals("FOLD")) {
-            Assert.assertEquals("Fold", expect, MimeUtility.fold(0, orig));
+            assertEquals(expect, MimeUtility.fold(0, orig), "Fold");
         } else if (direction.equals("UNFOLD")) {
-            Assert.assertEquals("Unfold", expect, MimeUtility.unfold(orig));
+            assertEquals(expect, MimeUtility.unfold(orig), "Unfold");
         } else {
-            Assert.fail("Unknown direction: " + direction);
+            fail("Unknown direction: " + direction);
         }
     }
 }

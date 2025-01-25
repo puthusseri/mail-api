@@ -16,12 +16,8 @@
 
 package jakarta.mail.internet;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
-
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -29,46 +25,40 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test InternetAddress folding.
  *
  * @author Bill Shannon
  */
 
-@RunWith(Parameterized.class)
 public class InternetAddressFoldTest {
-    private InternetAddress[] orig;
-    private String expect;
 
-    private static List<Object[]> testData;
-
-    public InternetAddressFoldTest(InternetAddress[] orig, String expect) {
-        this.orig = orig;
-        this.expect = expect;
-    }
-
-    @Parameters
+    /**
+     * Provides test data for the parameterized test.
+     */
     public static Collection<Object[]> data() throws Exception {
-        testData = new ArrayList<>();
+        List<Object[]> testData = new ArrayList<>();
         parse(new BufferedReader(new InputStreamReader(
-                InternetAddressFoldTest.class.getResourceAsStream("addrfolddata"))));
+                InternetAddressFoldTest.class.getResourceAsStream("addrfolddata"))), testData);
         return testData;
     }
 
     /**
-     * Read the data from the test file.  Format is:
-     *
+     * Read the data from the test file. Format is:
+     * <pre>
      * FOLD N
      * address1$
      * ...
      * addressN$
      * EXPECT
      * address1, ..., addressN$
+     * </pre>
      */
-    private static void parse(BufferedReader in) throws Exception {
+    private static void parse(BufferedReader in, List<Object[]> testData) throws Exception {
         String line;
         while ((line = in.readLine()) != null) {
-            if (line.startsWith("#") || line.length() == 0)
+            if (line.startsWith("#") || line.isEmpty())
                 continue;
             if (!line.startsWith("FOLD"))
                 throw new IOException("TEST DATA FORMAT ERROR, MISSING FOLD");
@@ -89,16 +79,20 @@ public class InternetAddressFoldTest {
      * especially including CR and LF.
      */
     private static String readString(BufferedReader in) throws IOException {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         int c;
         while ((c = in.read()) != '$')
             sb.append((char) c);
-        in.readLine();    // throw away rest of line
+        in.readLine(); // throw away the rest of the line
         return sb.toString();
     }
 
-    @Test
-    public void testFold() {
-        Assert.assertEquals("Fold", expect, InternetAddress.toString(orig, 0));
+    /**
+     * Parameterized test for folding addresses.
+     */
+    @ParameterizedTest
+    @MethodSource("data")
+    public void testFold(InternetAddress[] orig, String expect) {
+        assertEquals(expect, InternetAddress.toString(orig, 0), "Fold");
     }
 }
