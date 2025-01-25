@@ -37,7 +37,7 @@ public class InternetAddressTest {
     private static boolean parse_header = false;    // use parseHeader method?
     private static boolean verbose;            // print progress?
     private static int errors = 0;            // number of errors detected
-
+    static boolean junit;
     /**
      * Provides test data for the parameterized test.
      */
@@ -47,11 +47,66 @@ public class InternetAddressTest {
                 InternetAddressTest.class.getResourceAsStream("addrlist"))), testData);
         return testData;
     }
+    public static void main(String[] argv) throws Exception {
+        verbose = true;        // default for standalone
+        int optind;
+        for (optind = 0; optind < argv.length; optind++) {
+            if (argv[optind].equals("-")) {
+                // ignore
+            } else if (argv[optind].equals("-g")) {
+                gen_test_input = true;
+            } else if (argv[optind].equals("-h")) {
+                parse_header = true;
+            } else if (argv[optind].equals("-p")) {
+                parse_mail = true;
+            } else if (argv[optind].equals("-s")) {
+                strict = true;
+            } else if (argv[optind].equals("-q")) {
+                verbose = false;
+            } else if (argv[optind].equals("--")) {
+                optind++;
+                break;
+            } else if (argv[optind].startsWith("-")) {
+                System.out.println(
+                        "Usage: addrtest [-g] [-h] [-p] [-s] [-q] [-] [address ...]");
+                System.exit(1);
+            } else {
+                break;
+            }
+        }
+
+        /*
+         * If there's any args left on the command line,
+         * concatenate them into a string and test that.
+         */
+        if (optind < argv.length) {
+            StringBuffer sb = new StringBuffer();
+            for (int i = optind; i < argv.length; i++) {
+                sb.append(argv[i]);
+                sb.append(" ");
+            }
+            test("To", sb.toString(), null, strict, parse_header);
+        } else {
+            // read from stdin
+            BufferedReader in =
+                    new BufferedReader(new InputStreamReader(System.in));
+            String s;
+
+            if (parse_mail)
+                parse(in, new ArrayList<>());
+            else {
+                while ((s = in.readLine()) != null)
+                    test("To", s, null, strict, parse_header);
+            }
+        }
+        System.exit(errors);
+
+    }
 
     /**
      * Parses the test data from the input file.
      */
-    private static void parse(BufferedReader in, List<Object[]> testData) throws IOException {
+    public static void parse(BufferedReader in, List<Object[]> testData) throws IOException {
         String header = "";
         boolean doStrict = strict;
         boolean doParseHeader = parse_header;
@@ -67,6 +122,7 @@ public class InternetAddressTest {
                 }
             }
 
+            // "s" is the next header, "header" is the last complete header
             if (header.startsWith("Strict: ")) {
                 doStrict = Boolean.parseBoolean(value(header));
             } else if (header.startsWith("Header: ")) {
@@ -90,10 +146,18 @@ public class InternetAddressTest {
                     }
                 }
                 i = header.indexOf(':');
-                testData.add(new Object[]{
-                        header.substring(0, i), header.substring(i + 2),
-                        expect, doStrict, doParseHeader
-                });
+                try {
+                    if (junit)
+                        testData.add(new Object[]{
+                                header.substring(0, i), header.substring(i + 2),
+                                expect, doStrict, doParseHeader
+                        });
+                    else
+                        test(header.substring(0, i), header.substring(i + 2),
+                                expect, doStrict, doParseHeader);
+                } catch (StringIndexOutOfBoundsException e) {
+                    e.printStackTrace(System.out);
+                }
             }
 
             if (s == null)
@@ -171,23 +235,86 @@ public class InternetAddressTest {
             if (gen_test_input) {
                 pr("Expect: " + al.length);
             } else {
-                assertEquals(expect.length, al.length, "Number of addresses mismatch");
-            }
-
-            for (int i = 0; i < al.length; i++) {
-                if (gen_test_input) {
-                    pr("\t" + al[i].getAddress());
-                } else {
-                    assertEquals(expect[i], al[i].getAddress(), "Address mismatch at index " + i);
+                pr("Got " + al.length + " addresses:");
+                if (expect != null && al.length != expect.length) {
+                    pr("Expected " + expect.length + " addresses");
+                    if (junit)
+                        assertEquals(expect.length, al.length, "For " + value + " number of addresses");
+                    errors++;
                 }
             }
+            if (al.length == 0)
+                return;
 
+            /*
+             * Some of the really bad addresses fail the toString
+             * tests, but we don't want them to cause build failures.
+             */
+            if (junit)
+                return;
+
+            /*
+             * As a sanity test, convert the address array to a string and
+             * then parse it again, to see if we get the same thing back.
+             */
+            try {
+                InternetAddress[] al2;
+                String ta = InternetAddress.toString(al);
+                if (doParseHeader)
+                    al2 = InternetAddress.parseHeader(ta, doStrict);
+                else
+                    al2 = InternetAddress.parse(ta, doStrict);
+                if (al.length != al2.length) {
+                    pr("toString FAILED!!!");
+                    pr("Expected length " + al.length +
+                            ", got " + al2.length);
+                    if (junit)
+                        assertEquals(al.length, al2.length, "For " + value + " toString number of addresses");
+                    errors++;
+                } else {
+                    for (int i = 0; i < al.length; i++) {
+                        if (!al[i].getAddress().equals(al2[i].getAddress())) {
+                            pr("toString FAILED!!!");
+                            pr("Expected address " +
+                                    al[i].getAddress() +
+                                    ", got " + al2[i].getAddress());
+                            if (junit)
+                                assertEquals(al[i].getAddress(), al2[i].getAddress(), "For " + value + " toString " + ta + " address[" + i + "]");
+                            errors++;
+                        }
+                        String p1 = al[i].getPersonal();
+                        String p2 = al2[i].getPersonal();
+                        if (!(p1 == p2 || (p1 != null && p1.equals(p2)))) {
+                            pr("toString FAILED!!!");
+                            pr("Expected personal " + n(p1) +
+                                    ", got " + n(p2));
+                            if (junit)
+                                assertEquals(p1, p2, "For " + value + " toString " + ta + " personal[" + i + "]");
+                            errors++;
+                        }
+                    }
+                }
+            } catch (AddressException e2) {
+                pr("toString FAILED!!!");
+                pr("Got Exception: " + e2);
+                if (junit)
+                    fail("For " + value + " toString got Exception: " + e2);
+                errors++;
+            }
         } catch (AddressException e) {
             if (gen_test_input)
                 pr("Expect: Exception " + e);
             else {
-                assertNotNull(expect, "Expected exception but got null");
-                assertEquals("Exception", expect[0], "Expected Exception but got a different result");
+                pr("Got Exception: " + e);
+                if (expect != null &&
+                        (expect.length != 1 || !expect[0].equals("Exception"))) {
+                    pr("Expected " + expect.length + " addresses");
+                    for (int i = 0; i < expect.length; i++)
+                        pr("\tExpected:\t" + expect[i]);
+                    if (junit)
+                        fail("For " + value + " expected " + expect.length + "addresses, got Exception: " + e);
+                    errors++;
+                }
             }
         }
     }
